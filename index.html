@@ -133,6 +133,9 @@
         const exposure = parseFloat(exposureInput.value) / 100
         const threshold = parseFloat(thresholdInput.value) / 100
 
+        // Clear the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+
         ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
         const data = imageData.data
@@ -172,19 +175,9 @@
         image = new Image()
         image.src = URL.createObjectURL(file)
         image.onload = () => {
-          // Set canvas size to match image, but with a maximum size
-          const maxSize = 800
-          let width = image.width
-          let height = image.height
-
-          if (width > maxSize || height > maxSize) {
-            const ratio = Math.min(maxSize / width, maxSize / height)
-            width *= ratio
-            height *= ratio
-          }
-
-          canvas.width = width
-          canvas.height = height
+          // Set canvas size to match image dimensions
+          canvas.width = image.width
+          canvas.height = image.height
           applyDithering()
         }
       })
