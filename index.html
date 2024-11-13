@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Image Ditherer</title>
+    <title>Enhanced Image Ditherer</title>
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -11,9 +11,10 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        height: 100vh;
+        min-height: 100vh;
         margin: 0;
         background-color: #f0f0f0;
+        padding: 2rem;
       }
 
       .container {
@@ -22,15 +23,16 @@
         align-items: center;
         gap: 1rem;
         padding: 2rem;
-
+        background-color: white;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 900px;
       }
 
       canvas {
-        max-width: 800px;
+        max-width: 100%;
         border: 1px solid #ccc;
-
         background-color: rgb(138, 138, 130);
       }
 
@@ -39,6 +41,20 @@
         flex-direction: column;
         gap: 1rem;
         margin: 1rem 0;
+        width: 100%;
+        max-width: 400px;
+      }
+
+      .control-group {
+        border: 1px solid #eee;
+        padding: 1rem;
+        border-radius: 4px;
+        background-color: #fafafa;
+      }
+
+      .control-group h3 {
+        margin: 0 0 1rem 0;
+        color: #333;
       }
 
       input[type='file'],
@@ -51,51 +67,107 @@
         cursor: pointer;
       }
 
+      .slider-container {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+
       label {
-        display: block;
+        display: inline-block;
+        width: 120px;
         margin-bottom: 0.5rem;
       }
 
       input[type='range'] {
         width: 200px;
       }
+
+      .value-display {
+        min-width: 45px;
+        text-align: right;
+      }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>Image Ditherer</h1>
+      <h1>Enhanced Image Ditherer</h1>
       <input type="file" id="fileInput" accept="image/*" />
       <canvas id="canvas"></canvas>
       <div class="controls">
-        <div>
-          <label for="contrast">Contrast:</label>
-          <input
-            type="range"
-            id="contrast"
-            min="-100"
-            max="100"
-            value="0"
-            step="1" />
+        <div class="control-group">
+          <h3>Basic Adjustments</h3>
+          <div class="slider-container">
+            <label for="brightness">Brightness:</label>
+            <input
+              type="range"
+              id="brightness"
+              min="-100"
+              max="100"
+              value="0"
+              step="1" />
+            <span class="value-display" id="brightnessValue">0</span>
+          </div>
+          <div class="slider-container">
+            <label for="contrast">Contrast:</label>
+            <input
+              type="range"
+              id="contrast"
+              min="-100"
+              max="100"
+              value="0"
+              step="1" />
+            <span class="value-display" id="contrastValue">0</span>
+          </div>
+          <div class="slider-container">
+            <label for="exposure">Exposure:</label>
+            <input
+              type="range"
+              id="exposure"
+              min="-100"
+              max="100"
+              value="0"
+              step="1" />
+            <span class="value-display" id="exposureValue">0</span>
+          </div>
+
+          <div class="slider-container">
+            <label for="threshold">Threshold:</label>
+            <input
+              type="range"
+              id="threshold"
+              min="0"
+              max="100"
+              value="50"
+              step="1" />
+            <span class="value-display" id="thresholdValue">50</span>
+          </div>
         </div>
-        <div>
-          <label for="exposure">Exposure:</label>
-          <input
-            type="range"
-            id="exposure"
-            min="-100"
-            max="100"
-            value="0"
-            step="1" />
-        </div>
-        <div>
-          <label for="threshold">Threshold:</label>
-          <input
-            type="range"
-            id="threshold"
-            min="0"
-            max="100"
-            value="50"
-            step="1" />
+
+        <div class="control-group">
+          <h3>Vignette</h3>
+          <div class="slider-container">
+            <label for="vignetteAmount">Amount:</label>
+            <input
+              type="range"
+              id="vignetteAmount"
+              min="0"
+              max="100"
+              value="0"
+              step="1" />
+            <span class="value-display" id="vignetteAmountValue">0</span>
+          </div>
+          <div class="slider-container">
+            <label for="vignetteSpread">Spread:</label>
+            <input
+              type="range"
+              id="vignetteSpread"
+              min="0"
+              max="100"
+              value="50"
+              step="1" />
+            <span class="value-display" id="vignetteSpreadValue">50</span>
+          </div>
         </div>
       </div>
       <button id="downloadBtn">Download as PNG</button>
@@ -105,39 +177,106 @@
       const fileInput = document.getElementById('fileInput')
       const canvas = document.getElementById('canvas')
       const ctx = canvas.getContext('2d')
-      const contrastInput = document.getElementById('contrast')
-      const exposureInput = document.getElementById('exposure')
-      const thresholdInput = document.getElementById('threshold')
       const downloadBtn = document.getElementById('downloadBtn')
 
-      // Define the 4x4 Bayer matrix pattern similar to your shader
+      // Get all input elements and their value displays
+      const inputs = {
+        brightness: document.getElementById('brightness'),
+        contrast: document.getElementById('contrast'),
+        exposure: document.getElementById('exposure'),
+        vignetteAmount: document.getElementById('vignetteAmount'),
+        vignetteSpread: document.getElementById('vignetteSpread'),
+        threshold: document.getElementById('threshold'),
+      }
+
+      const valueDisplays = {}
+      Object.keys(inputs).forEach((key) => {
+        valueDisplays[key] = document.getElementById(`${key}Value`)
+      })
+
+      // Define the 4x4 Bayer matrix pattern
       const bayerMatrix4x4 = [
         0, 14, 3, 13, 11, 6, 8, 5, 12, 2, 15, 1, 7, 10, 4, 9,
       ]
 
       let image = null
 
-      function adjustPixel(value, contrast, exposure) {
+      // Load settings from localStorage
+      function loadSettings() {
+        Object.keys(inputs).forEach((key) => {
+          const savedValue = localStorage.getItem(key)
+          if (savedValue !== null) {
+            inputs[key].value = savedValue
+            valueDisplays[key].textContent = savedValue
+          }
+        })
+      }
+
+      // Save settings to localStorage
+      function saveSettings() {
+        Object.keys(inputs).forEach((key) => {
+          localStorage.setItem(key, inputs[key].value)
+        })
+      }
+
+      function adjustPixel(value, brightness, contrast, exposure) {
+        // Apply brightness
+        value += brightness * 2.55
+
         // Apply exposure
-        value += exposure * 255
+        value += (exposure * 255) / 100
 
         // Apply contrast
-        const factor = (259 * (contrast + 255)) / (255 * (259 - contrast))
+        const factor =
+          (259 * (contrast * 2.55 + 255)) / (255 * (259 - contrast * 2.55))
         value = factor * (value - 128) + 128
 
         return Math.max(0, Math.min(255, value))
       }
 
+      function applyVignette(x, y, width, height, amount, spread) {
+        const centerX = width / 2
+        const centerY = height / 2
+
+        // Calculate normalized distance from center (0 to 1)
+        const dx = (x - centerX) / (width / 2)
+        const dy = (y - centerY) / (height / 2)
+        const distance = Math.sqrt(dx * dx + dy * dy)
+
+        // Convert spread from 0-100 to a more useful range
+        // Higher spread values mean the vignette starts further from the edges
+        const spreadFactor = 1 - spread / 100
+
+        // Calculate where vignette effect should start (0 to 1)
+        const vignetteStart = spreadFactor
+
+        // If distance is less than vignetteStart, return 1 (no effect)
+        if (distance < vignetteStart) {
+          return 1
+        }
+
+        // Calculate vignette effect only for the outer edges
+        const vignetteEffect = Math.max(
+          0,
+          1 - (distance - vignetteStart) / (1 - vignetteStart)
+        )
+
+        // Calculate final multiplier (1 = no effect, 0 = full darkness)
+        return 1 - (1 - vignetteEffect) * (amount / 100)
+      }
+
       function applyDithering() {
         if (!image) return
 
-        const contrast = parseInt(contrastInput.value) * 2.55
-        const exposure = parseFloat(exposureInput.value) / 100
-        const threshold = parseFloat(thresholdInput.value) / 100
+        const brightness = parseInt(inputs.brightness.value)
+        const contrast = parseInt(inputs.contrast.value)
+        const exposure = parseFloat(inputs.exposure.value)
+        const threshold = parseFloat(inputs.threshold.value) / 100
+        const vignetteAmount = parseFloat(inputs.vignetteAmount.value)
+        const vignetteSpread = parseFloat(inputs.vignetteSpread.value)
 
         // Clear the canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height)
-
         ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
         const data = imageData.data
@@ -146,13 +285,24 @@
           for (let x = 0; x < canvas.width; x++) {
             const i = (y * canvas.width + x) * 4
 
-            // Get original color and apply adjustments
-            const r = adjustPixel(data[i], contrast, exposure)
-            const g = adjustPixel(data[i + 1], contrast, exposure)
-            const b = adjustPixel(data[i + 2], contrast, exposure)
+            // Apply adjustments
+            const r = adjustPixel(data[i], brightness, contrast, exposure)
+            const g = adjustPixel(data[i + 1], brightness, contrast, exposure)
+            const b = adjustPixel(data[i + 2], brightness, contrast, exposure)
 
             // Convert to grayscale
             const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+            // Apply vignette
+            const vignetteMultiplier = applyVignette(
+              x,
+              y,
+              canvas.width,
+              canvas.height,
+              vignetteAmount,
+              vignetteSpread
+            )
+            const vignetteGray = gray * vignetteMultiplier
 
             // Get dither threshold from matrix
             const matrixX = x % 4
@@ -160,7 +310,7 @@
             const dither = bayerMatrix4x4[matrixY * 4 + matrixX] / 16.0
 
             // Apply threshold and dithering
-            const normalizedGray = gray / 255
+            const normalizedGray = vignetteGray / 255
             const ditheredValue = normalizedGray > dither * threshold ? 255 : 0
 
             data[i] = ditheredValue
@@ -170,23 +320,27 @@
         }
 
         ctx.putImageData(imageData, 0, 0)
+        saveSettings()
       }
 
+      // Event Listeners
       fileInput.addEventListener('change', (event) => {
         const file = event.target.files[0]
         image = new Image()
         image.src = URL.createObjectURL(file)
         image.onload = () => {
-          // Set canvas size to match image dimensions
           canvas.width = image.width
           canvas.height = image.height
           applyDithering()
         }
       })
 
-      contrastInput.addEventListener('input', applyDithering)
-      exposureInput.addEventListener('input', applyDithering)
-      thresholdInput.addEventListener('input', applyDithering)
+      Object.keys(inputs).forEach((key) => {
+        inputs[key].addEventListener('input', (e) => {
+          valueDisplays[key].textContent = e.target.value
+          applyDithering()
+        })
+      })
 
       downloadBtn.addEventListener('click', () => {
         const link = document.createElement('a')
@@ -194,6 +348,9 @@
         link.href = canvas.toDataURL('image/png')
         link.click()
       })
+
+      // Load saved settings on page load
+      loadSettings()
     </script>
   </body>
 </html>
